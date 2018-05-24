@@ -1,0 +1,10 @@
+.idea/
+
+*.iml
+*.ipr
+
+target/
+build/
+out/
+
+*.log
