@@ -4,16 +4,31 @@ import com.jogamp.opengl.glu.GLU;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 
 import static com.jogamp.opengl.GL.*;
 import static com.jogamp.opengl.GL2ES1.GL_PERSPECTIVE_CORRECTION_HINT;
-import static com.jogamp.opengl.fixedfunc.GLLightingFunc.GL_SMOOTH;
-import static com.jogamp.opengl.fixedfunc.GLMatrixFunc.GL_MODELVIEW;
-import static com.jogamp.opengl.fixedfunc.GLMatrixFunc.GL_PROJECTION;
+import static com.jogamp.opengl.fixedfunc.GLLightingFunc.*;
+import static com.jogamp.opengl.fixedfunc.GLMatrixFunc.*;
 
 public class MainFrame extends JFrame {
 
+    private GLCanvas canvas;
     private GLU glu;
+    private MouseEvent mouse;
+    
+    private float translateX = 0f;
+    private float translateY = 0f;
+    private float translateZ = 0f;
+  
+    private float positionX = 0f;
+    private float positionY = 0f;
+    private float positionZ = 1f;
+  
+  private int width = 800;
+  private int height = 600;
+  
+  private float zoom = 0.5f;
 
     private MainFrame() {
         super("GLCoordinates");
@@ -22,7 +37,7 @@ public class MainFrame extends JFrame {
 
         GLProfile profile = GLProfile.getDefault();
         GLCapabilities capabilities = new GLCapabilities(profile);
-        GLCanvas canvas = new GLCanvas(capabilities);
+        canvas = new GLCanvas(capabilities);
 
         canvas.addGLEventListener(new GLEventListener() {
             public void init(GLAutoDrawable drawable) {
@@ -42,33 +57,120 @@ public class MainFrame extends JFrame {
             public void display(GLAutoDrawable drawable) {
                 GL2 gl = drawable.getGL().getGL2();
                 gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+              
+               gl.glMatrixMode(GL_PROJECTION);
+                gl.glLoadIdentity();
+               System.out.println("w:" + width + " h:" + height);
+//                glu.gluPerspective(45.0, aspect, 0.1, 100.0);
+                gl.glOrtho(-width/2f*zoom, width/2f*zoom, -height/2f*zoom, height/2f*zoom, -1.0, 1.0);
+
+               
+                  
+                glu.gluLookAt(positionX, positionY, positionZ, positionX, positionY, 0, 0,1,0);
+              
+                int viewport[] = new int[4];
+                double mvmatrix[] = new double[16];
+                double projmatrix[] = new double[16];
+                int realy = 0;// GL y coord pos
+                double wcoord[] = new double[4];// wx, wy, wz;// returned xyz coords
+              
+                if (mouse != null)
+                {
+                  int x = mouse.getX(), y = mouse.getY();
+                  switch (mouse.getButton()) {
+                    case MouseEvent.BUTTON1:
+                      gl.glGetIntegerv(GL_VIEWPORT, viewport, 0);
+                      gl.glGetDoublev(GL_MODELVIEW_MATRIX, mvmatrix, 0);
+                      gl.glGetDoublev(GL_PROJECTION_MATRIX, projmatrix, 0);
+                      /* note viewport[3] is height of window in pixels */
+                      realy = viewport[3] - (int) y - 1;
+                      System.out.println("Coordinates at cursor are (" + x + ", " + realy);
+                      glu.gluUnProject((double) x, (double) realy, 0.0, //
+                          mvmatrix, 0,
+                          projmatrix, 0, 
+                          viewport, 0, 
+                          wcoord, 0);
+                      System.out.println("World coords at z=0.0 are ( " //
+                                         + wcoord[0] + ", " + wcoord[1] + ", " + wcoord[2]
+                                         + ")");
+                      glu.gluUnProject((double) x, (double) realy, 1.0, //
+                          mvmatrix, 0,
+                          projmatrix, 0,
+                          viewport, 0, 
+                          wcoord, 0);
+                      System.out.println("World coords at z=1.0 are (" //
+                                         + wcoord[0] + ", " + wcoord[1] + ", " + wcoord[2]
+                                         + ")");
+                      break;
+                    case MouseEvent.BUTTON2:
+                      break;
+                    default:
+                      break;
+                  }
+                }
+              
+               gl.glMatrixMode(GL_MODELVIEW);
                 gl.glLoadIdentity();
 
-                gl.glTranslatef(0.0f, 0.0f, -6.0f);
                 gl.glBegin(GL_TRIANGLES);
                 gl.glVertex3f(0.0f, 1.0f, 0.0f);
                 gl.glVertex3f(-1.0f, -1.0f, 0.0f);
                 gl.glVertex3f(1.0f, -1.0f, 0.0f);
                 gl.glEnd();
+              
+//                              gl.glTranslatef(translateX, translateY, translateZ);
+
             }
 
-            public void reshape(GLAutoDrawable drawable, int x, int y, int width, int height) {
+            public void reshape(GLAutoDrawable drawable, int x, int y, int w, int h) {
                 GL2 gl = drawable.getGL().getGL2();
 
-                if (height == 0) height = 1;
-                float aspect = (float) width / height;
 
+                width = w;
+              height = h;
+              
                 gl.glViewport(0, 0, width, height);
 
-                gl.glMatrixMode(GL_PROJECTION);
-                gl.glLoadIdentity();
-                glu.gluPerspective(45.0, aspect, 0.1, 100.0);
-
-                gl.glMatrixMode(GL_MODELVIEW);
-                gl.glLoadIdentity();
+               
             }
         });
-
+      
+        canvas.addKeyListener(new KeyAdapter() {
+            public void keyTyped(KeyEvent e) {
+                char c = e.getKeyChar();
+                float speed = 0.5f;
+                switch (c) {
+                    case 'w':  
+                        positionY += speed;
+                        break;
+                    case 'a':
+                        positionX -= speed;
+                        break;
+                    case 's':
+                        positionY -= speed;
+                        break;
+                    case 'd':
+                        positionX += speed;
+                        break;
+                    case '+':
+                        zoom -= 0.01f;
+                        break;
+                    case '-':
+                        zoom += 0.01f;
+                        break;
+                }
+              System.out.println("translate:["+positionX+","+positionY+","+zoom+"]");
+                canvas.display();
+            }
+        });
+      
+        canvas.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                mouse = e;
+                canvas.display();
+            }
+        });
+      
         add(canvas, BorderLayout.CENTER);
         setBackground(Color.WHITE);
         setSize(800, 600);
